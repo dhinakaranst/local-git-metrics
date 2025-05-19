@@ -4,59 +4,113 @@ import { useLocation } from "react-router-dom";
 import { ChartContainer, ChartTooltipContent, ChartTooltip } from "@/components/ui/chart";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar } from "recharts";
 import { Button } from "@/components/ui/button";
-import { Calendar, ChartBar, ChartLine, ChartPie, Filter } from "lucide-react";
-
-// Mock data (will be replaced with real Git data)
-const commitData = [
-  { date: "2025-05-01", commits: 4 },
-  { date: "2025-05-02", commits: 2 },
-  { date: "2025-05-03", commits: 6 },
-  { date: "2025-05-04", commits: 8 },
-  { date: "2025-05-05", commits: 5 },
-  { date: "2025-05-06", commits: 10 },
-  { date: "2025-05-07", commits: 3 },
-  { date: "2025-05-08", commits: 7 },
-  { date: "2025-05-09", commits: 9 },
-  { date: "2025-05-10", commits: 4 },
-  { date: "2025-05-11", commits: 6 },
-  { date: "2025-05-12", commits: 11 },
-  { date: "2025-05-13", commits: 8 },
-  { date: "2025-05-14", commits: 7 },
-];
-
-const languageData = [
-  { name: "JavaScript", value: 45, color: "#f7df1e" },
-  { name: "TypeScript", value: 30, color: "#3178c6" },
-  { name: "CSS", value: 15, color: "#264de4" },
-  { name: "HTML", value: 10, color: "#e34c26" },
-];
-
-const topFilesData = [
-  { name: "src/components/App.tsx", changes: 25 },
-  { name: "src/utils/helpers.ts", changes: 20 },
-  { name: "src/styles/main.css", changes: 18 },
-  { name: "src/pages/Home.tsx", changes: 15 },
-  { name: "src/api/client.ts", changes: 12 },
-];
+import { Calendar, ChartBar, ChartLine, ChartPie, Filter, Download } from "lucide-react";
+import { toast } from "@/components/ui/use-toast";
+import Layout from "@/components/Layout";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useRepoLanguages, useRepoSummary, useTopFiles } from "@/hooks/useRepoData";
+import repoService from "@/services/repoService";
 
 const Dashboard = () => {
   const location = useLocation();
   const [repoPath, setRepoPath] = useState("");
   const [timeRange, setTimeRange] = useState("week");
-  const [isLoading, setIsLoading] = useState(true);
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
+  const queryClient = useQueryClient();
   
+  // Get repo path from URL
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const path = params.get("path");
     if (path) {
       setRepoPath(decodeURIComponent(path));
-      
-      // Simulate loading data from backend
-      setTimeout(() => {
-        setIsLoading(false);
-      }, 1500);
+      analyzePath(decodeURIComponent(path));
     }
   }, [location]);
+
+  // Mutation for analyzing repo
+  const analyzeRepoMutation = useMutation({
+    mutationFn: (path: string) => repoService.analyzeRepo(path),
+    onSuccess: () => {
+      toast({
+        title: "Repository analyzed successfully",
+        description: "View the analytics below",
+      });
+      setIsInitialLoading(false);
+      
+      // Refresh all repo data queries
+      queryClient.invalidateQueries({ queryKey: ['repoSummary'] });
+      queryClient.invalidateQueries({ queryKey: ['repoLanguages'] });
+      queryClient.invalidateQueries({ queryKey: ['topFiles'] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error analyzing repository",
+        description: error.message,
+        variant: "destructive",
+      });
+      setIsInitialLoading(false);
+    }
+  });
+
+  // Function to trigger repo analysis
+  const analyzePath = (path: string) => {
+    setIsInitialLoading(true);
+    analyzeRepoMutation.mutate(path);
+  };
+
+  // Mutation for exporting as PDF
+  const exportPdfMutation = useMutation({
+    mutationFn: () => repoService.exportAsPdf({
+      repoPath,
+      timeRange,
+    }),
+    onSuccess: (blob) => {
+      // Create a URL for the blob
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `commitmetrics-report-${new Date().toISOString().split('T')[0]}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      
+      toast({
+        title: "PDF exported successfully",
+        description: "The report has been downloaded",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error exporting PDF",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  });
+
+  // Data queries
+  const { data: languages } = useRepoLanguages();
+  const { data: topFiles } = useTopFiles(5);
+  const { data: summary } = useRepoSummary();
+
+  // Prepare data for charts
+  const languageData = languages ? 
+    Object.entries(languages).map(([name, value]) => ({
+      name,
+      value,
+      color: getColorForLanguage(name),
+    })) : [];
+
+  const topFilesData = topFiles || [];
+
+  // Mock data for commit chart (will be replaced with real data)
+  const commitData = summary?.commitCountByDate ? 
+    Object.entries(summary.commitCountByDate).map(([date, count]) => ({
+      date,
+      commits: count,
+    })).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()) : [];
 
   // Chart configurations
   const chartConfig = {
@@ -73,41 +127,76 @@ const Dashboard = () => {
     },
   };
 
-  if (isLoading) {
+  // Helper function to get color for language
+  function getColorForLanguage(language: string): string {
+    const colors: Record<string, string> = {
+      JavaScript: "#f7df1e",
+      TypeScript: "#3178c6",
+      CSS: "#264de4",
+      HTML: "#e34c26",
+      Python: "#3572A5",
+      Java: "#b07219",
+      CSharp: "#178600",
+      PHP: "#4F5D95",
+      Ruby: "#701516",
+      Go: "#00ADD8",
+      Rust: "#dea584",
+      Swift: "#ffac45",
+      Kotlin: "#F18E33",
+      Scala: "#c22d40",
+      Objective_C: "#438eff",
+      C: "#555555",
+      CPlusPlus: "#f34b7d",
+    };
+    
+    return colors[language] || `#${Math.floor(Math.random()*16777215).toString(16)}`;
+  }
+
+  // Render loading state
+  if (isInitialLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <h2 className="text-2xl font-bold mb-4">Analyzing repository...</h2>
-          <p className="text-muted-foreground mb-4">This may take a moment</p>
+      <Layout>
+        <div className="min-h-screen flex items-center justify-center">
+          <div className="text-center">
+            <h2 className="text-2xl font-bold mb-4">Analyzing repository...</h2>
+            <p className="text-muted-foreground mb-4">This may take a moment</p>
+          </div>
         </div>
-      </div>
+      </Layout>
     );
   }
 
   return (
-    <div className="min-h-screen flex flex-col">
-      <header className="border-b">
-        <div className="container mx-auto py-4 px-4 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold">CommitMetrics</h1>
-            <p className="text-sm text-muted-foreground">{repoPath}</p>
+    <Layout>
+      <div className="container mx-auto py-6 px-4">
+        <header className="mb-8">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div>
+              <h1 className="text-2xl font-bold">Repository Dashboard</h1>
+              <p className="text-sm text-muted-foreground">{repoPath}</p>
+            </div>
+            
+            <div className="flex items-center gap-2">
+              <Button size="sm" variant="outline">
+                <Filter className="h-4 w-4 mr-1" />
+                Filter
+              </Button>
+              <Button size="sm" variant="outline">
+                <Calendar className="h-4 w-4 mr-1" />
+                {timeRange === "week" ? "Last Week" : timeRange === "month" ? "Last Month" : "All Time"}
+              </Button>
+              <Button 
+                size="sm"
+                onClick={() => exportPdfMutation.mutate()}
+                disabled={exportPdfMutation.isPending}
+              >
+                <Download className="h-4 w-4 mr-1" />
+                {exportPdfMutation.isPending ? "Exporting..." : "Export PDF"}
+              </Button>
+            </div>
           </div>
-          
-          <div className="flex items-center gap-2">
-            <Button size="sm" variant="outline">
-              <Filter className="h-4 w-4 mr-1" />
-              Filter
-            </Button>
-            <Button size="sm" variant="outline">
-              <Calendar className="h-4 w-4 mr-1" />
-              {timeRange === "week" ? "Last Week" : timeRange === "month" ? "Last Month" : "All Time"}
-            </Button>
-            <Button size="sm">Export PDF</Button>
-          </div>
-        </div>
-      </header>
-      
-      <main className="flex-1 container mx-auto py-6 px-4">
+        </header>
+        
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2">
             <div className="bg-card rounded-lg p-4 border h-full">
@@ -199,7 +288,7 @@ const Dashboard = () => {
                 >
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis type="number" />
-                  <YAxis type="category" dataKey="name" width={150} />
+                  <YAxis type="category" dataKey="filename" width={150} />
                   <ChartTooltip />
                   <Bar dataKey="changes" fill="#8884d8" />
                 </BarChart>
@@ -207,14 +296,8 @@ const Dashboard = () => {
             </div>
           </div>
         </div>
-      </main>
-      
-      <footer className="border-t mt-auto">
-        <div className="container mx-auto py-4 text-center text-muted-foreground">
-          <p>CommitMetrics &copy; 2025 - A self-hostable Git analytics tool</p>
-        </div>
-      </footer>
-    </div>
+      </div>
+    </Layout>
   );
 };
 

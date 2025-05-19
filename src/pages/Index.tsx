@@ -5,11 +5,32 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useNavigate } from "react-router-dom";
 import { toast } from "@/components/ui/use-toast";
+import Layout from "@/components/Layout";
+import { useMutation } from "@tanstack/react-query";
+import repoService from "@/services/repoService";
 
 const Index = () => {
   const [repoPath, setRepoPath] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
+
+  // Mutation for analyzing repository
+  const analyzeRepoMutation = useMutation({
+    mutationFn: (path: string) => repoService.analyzeRepo(path),
+    onSuccess: (data) => {
+      toast({
+        title: "Success",
+        description: "Repository analyzed successfully",
+      });
+      navigate(`/dashboard?path=${encodeURIComponent(repoPath)}`);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -22,24 +43,11 @@ const Index = () => {
       return;
     }
 
-    setIsLoading(true);
-    
-    // For now, we'll just navigate to the dashboard with the path as a parameter
-    // In a real implementation, this would validate the repo path on the backend
-    setTimeout(() => {
-      setIsLoading(false);
-      navigate(`/dashboard?path=${encodeURIComponent(repoPath)}`);
-    }, 1000);
+    analyzeRepoMutation.mutate(repoPath);
   };
 
   return (
-    <div className="min-h-screen flex flex-col">
-      <header className="border-b">
-        <div className="container mx-auto py-4">
-          <h1 className="text-2xl font-bold">CommitMetrics</h1>
-        </div>
-      </header>
-      
+    <Layout>
       <main className="flex-1 container mx-auto py-8 px-4">
         <div className="max-w-2xl mx-auto text-center">
           <h2 className="text-4xl font-bold mb-6">Analyze Your Git Repository</h2>
@@ -68,9 +76,9 @@ const Index = () => {
               <Button 
                 type="submit" 
                 className="w-full"
-                disabled={isLoading}
+                disabled={analyzeRepoMutation.isPending}
               >
-                {isLoading ? "Analyzing..." : "Analyze Repository"}
+                {analyzeRepoMutation.isPending ? "Analyzing..." : "Analyze Repository"}
               </Button>
             </form>
           </div>
@@ -94,13 +102,7 @@ const Index = () => {
           </div>
         </div>
       </main>
-      
-      <footer className="border-t mt-auto">
-        <div className="container mx-auto py-4 text-center text-muted-foreground">
-          <p>CommitMetrics &copy; 2025 - A self-hostable Git analytics tool</p>
-        </div>
-      </footer>
-    </div>
+    </Layout>
   );
 };
 

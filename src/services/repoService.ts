@@ -35,6 +35,7 @@ export interface RepoSummary {
   topFiles: FileChangeData[];
   languages: Record<string, number>;
   authors: string[];
+  commitCountByDate: Record<string, number>; // Added this property
 }
 
 export interface CommitsResponse {

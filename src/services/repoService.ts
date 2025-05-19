@@ -4,6 +4,7 @@ import apiRequest from './api';
 // Types based on API specs
 export interface RepoAnalysisRequest {
   repoPath: string;
+  isRemoteUrl?: boolean;
 }
 
 export interface CommitData {
@@ -35,7 +36,7 @@ export interface RepoSummary {
   topFiles: FileChangeData[];
   languages: Record<string, number>;
   authors: string[];
-  commitCountByDate: Record<string, number>; // Added this property
+  commitCountByDate: Record<string, number>;
 }
 
 export interface CommitsResponse {
@@ -43,11 +44,14 @@ export interface CommitsResponse {
 }
 
 export const repoService = {
-  // Analyze a repository from its path
+  // Analyze a repository from its path or URL
   analyzeRepo: (repoPath: string): Promise<RepoAnalysisResponse> => {
+    // Check if the path is a URL
+    const isRemoteUrl = repoPath.startsWith('http://') || repoPath.startsWith('https://');
+    
     return apiRequest('/api/repo/analyze', {
       method: 'POST',
-      body: JSON.stringify({ repoPath }),
+      body: JSON.stringify({ repoPath, isRemoteUrl }),
     });
   },
 

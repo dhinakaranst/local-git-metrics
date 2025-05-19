@@ -9,13 +9,21 @@ const apiRequest = async (endpoint: string, options: RequestInit = {}) => {
     
     console.log(`Making API request to: ${url}`);
     
+    // Add timeout to fetch using AbortController
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 seconds timeout
+    
     const response = await fetch(url, {
       ...options,
       headers: {
         'Content-Type': 'application/json',
         ...options.headers,
       },
+      signal: controller.signal
     });
+    
+    // Clear the timeout as request completed
+    clearTimeout(timeoutId);
 
     // Handle non-2xx responses
     if (!response.ok) {
@@ -31,6 +39,14 @@ const apiRequest = async (endpoint: string, options: RequestInit = {}) => {
     return response.json();
   } catch (error) {
     console.error('API request error:', error);
+    
+    // Provide more user-friendly error messages
+    if (error instanceof TypeError && error.message === 'Failed to fetch') {
+      throw new Error('Could not connect to the server. Please check your internet connection or try again later.');
+    } else if (error.name === 'AbortError') {
+      throw new Error('Request timed out. The server took too long to respond.');
+    }
+    
     throw error;
   }
 };

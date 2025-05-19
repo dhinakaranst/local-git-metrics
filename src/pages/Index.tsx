@@ -72,17 +72,17 @@ const Index = () => {
             
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="text-left">
-                <Label htmlFor="repoPath">Repository Path</Label>
+                <Label htmlFor="repoPath">Repository Path or URL</Label>
                 <Input 
                   id="repoPath"
                   type="text"
-                  placeholder="/path/to/your/repository"
+                  placeholder="/path/to/repo or https://github.com/username/repo"
                   value={repoPath}
                   onChange={(e) => setRepoPath(e.target.value)}
                   className="mt-1"
                 />
                 <p className="text-sm text-muted-foreground mt-1">
-                  Enter the full path to your local Git repository
+                  Enter the full path to your local Git repository or a GitHub URL
                 </p>
               </div>
               
@@ -96,12 +96,22 @@ const Index = () => {
             </form>
           </div>
           
+          <div className="mt-6">
+            <Alert className="mb-4">
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>Connection Issues?</AlertTitle>
+              <AlertDescription>
+                The API service might be starting up from cold storage. Please wait a moment and try again if your first attempt fails.
+              </AlertDescription>
+            </Alert>
+          </div>
+          
           <div className="mt-12">
             <h3 className="text-xl font-medium mb-4">How it works</h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <div className="bg-card p-4 rounded-lg border">
                 <div className="text-lg font-medium mb-2">1. Input Path</div>
-                <p className="text-muted-foreground">Enter the path to your local Git repository</p>
+                <p className="text-muted-foreground">Enter the path to your local Git repository or a Git URL</p>
               </div>
               <div className="bg-card p-4 rounded-lg border">
                 <div className="text-lg font-medium mb-2">2. Analyze</div>

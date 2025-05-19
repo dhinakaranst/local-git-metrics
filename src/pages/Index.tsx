@@ -8,6 +8,8 @@ import { toast } from "@/components/ui/use-toast";
 import Layout from "@/components/Layout";
 import { useMutation } from "@tanstack/react-query";
 import repoService from "@/services/repoService";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { AlertCircle } from "lucide-react";
 
 const Index = () => {
   const [repoPath, setRepoPath] = useState("");
@@ -24,9 +26,10 @@ const Index = () => {
       navigate(`/dashboard?path=${encodeURIComponent(repoPath)}`);
     },
     onError: (error: Error) => {
+      console.error("Repository analysis failed:", error);
       toast({
         title: "Error",
-        description: error.message,
+        description: `Repository analysis failed: ${error.message}`,
         variant: "destructive",
       });
     }
@@ -57,6 +60,16 @@ const Index = () => {
           </p>
           
           <div className="bg-card rounded-lg p-6 shadow-sm border">
+            {analyzeRepoMutation.isError && (
+              <Alert variant="destructive" className="mb-4">
+                <AlertCircle className="h-4 w-4" />
+                <AlertTitle>Error</AlertTitle>
+                <AlertDescription>
+                  {analyzeRepoMutation.error?.message || "Failed to analyze repository. Please try again."}
+                </AlertDescription>
+              </Alert>
+            )}
+            
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="text-left">
                 <Label htmlFor="repoPath">Repository Path</Label>

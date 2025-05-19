@@ -1,11 +1,14 @@
 
 // Base API configuration
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://commit-metrics-api.onrender.com';
 
 // Helper function for making API requests
 const apiRequest = async (endpoint: string, options: RequestInit = {}) => {
   try {
     const url = `${API_BASE_URL}${endpoint}`;
+    
+    console.log(`Making API request to: ${url}`);
+    
     const response = await fetch(url, {
       ...options,
       headers: {

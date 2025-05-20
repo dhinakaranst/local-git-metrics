@@ -1,10 +1,16 @@
 
 // Base API configuration
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://commit-metrics-api.onrender.com';
+const DEFAULT_API_BASE_URL = 'https://commit-metrics-api.onrender.com';
+// Allow custom API URL from local storage or environment variable
+const getApiBaseUrl = () => {
+  const customUrl = localStorage.getItem('CUSTOM_API_URL');
+  return customUrl || import.meta.env.VITE_API_BASE_URL || DEFAULT_API_BASE_URL;
+};
 
 // Helper function for making API requests
 const apiRequest = async (endpoint: string, options: RequestInit = {}) => {
   try {
+    const API_BASE_URL = getApiBaseUrl();
     const url = `${API_BASE_URL}${endpoint}`;
     
     console.log(`Making API request to: ${url}`);
@@ -82,4 +88,23 @@ const apiRequest = async (endpoint: string, options: RequestInit = {}) => {
   }
 };
 
+// Export function to set custom API URL
+export const setCustomApiUrl = (url: string) => {
+  if (url && url.trim() !== '') {
+    localStorage.setItem('CUSTOM_API_URL', url.trim());
+    console.log(`Custom API URL set to: ${url}`);
+    return true;
+  } else {
+    localStorage.removeItem('CUSTOM_API_URL');
+    console.log('Custom API URL removed, using default');
+    return false;
+  }
+};
+
+// Export function to get current API URL
+export const getCurrentApiUrl = () => {
+  return getApiBaseUrl();
+};
+
 export default apiRequest;
+

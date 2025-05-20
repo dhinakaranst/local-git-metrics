@@ -9,12 +9,39 @@ import Layout from "@/components/Layout";
 import { useMutation } from "@tanstack/react-query";
 import repoService from "@/services/repoService";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { AlertCircle, Clock } from "lucide-react";
+import { AlertCircle, Clock, Settings } from "lucide-react";
+import { setCustomApiUrl, getCurrentApiUrl } from "@/services/api";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
+import { zodResolver } from "@hookform/resolvers/zod";
 
 const Index = () => {
   const [repoPath, setRepoPath] = useState("");
   const [isConnecting, setIsConnecting] = useState(false);
+  const [showApiSettings, setShowApiSettings] = useState(false);
   const navigate = useNavigate();
+
+  // Form schema for API URL
+  const apiFormSchema = z.object({
+    apiUrl: z.string().url("Please enter a valid URL").or(z.string().length(0))
+  });
+
+  const apiForm = useForm<z.infer<typeof apiFormSchema>>({
+    resolver: zodResolver(apiFormSchema),
+    defaultValues: {
+      apiUrl: getCurrentApiUrl() === 'https://commit-metrics-api.onrender.com' ? '' : getCurrentApiUrl(),
+    },
+  });
 
   // Mutation for analyzing repository
   const analyzeRepoMutation = useMutation({
@@ -55,11 +82,69 @@ const Index = () => {
     analyzeRepoMutation.mutate(repoPath);
   };
 
+  // Handle API URL form submission
+  const onApiFormSubmit = (values: z.infer<typeof apiFormSchema>) => {
+    if (values.apiUrl) {
+      setCustomApiUrl(values.apiUrl);
+      toast({
+        title: "API URL Updated",
+        description: "Custom API URL has been set. The app will use this URL for API requests.",
+      });
+    } else {
+      setCustomApiUrl("");
+      toast({
+        title: "Default API URL Restored",
+        description: "Using the default API URL for requests.",
+      });
+    }
+    setShowApiSettings(false);
+  };
+
   return (
     <Layout>
       <main className="flex-1 container mx-auto py-8 px-4">
         <div className="max-w-2xl mx-auto text-center">
-          <h2 className="text-4xl font-bold mb-6">Analyze Your Git Repository</h2>
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-4xl font-bold">Analyze Your Git Repository</h2>
+            <Dialog open={showApiSettings} onOpenChange={setShowApiSettings}>
+              <DialogTrigger asChild>
+                <Button variant="outline" size="icon">
+                  <Settings className="h-4 w-4" />
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>API Settings</DialogTitle>
+                  <DialogDescription>
+                    Configure custom API endpoint for repository analysis.
+                  </DialogDescription>
+                </DialogHeader>
+                <Form {...apiForm}>
+                  <form onSubmit={apiForm.handleSubmit(onApiFormSubmit)} className="space-y-4">
+                    <FormField
+                      control={apiForm.control}
+                      name="apiUrl"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Custom API URL (optional)</FormLabel>
+                          <FormControl>
+                            <Input 
+                              placeholder="https://your-custom-api.com" 
+                              {...field} 
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <DialogFooter>
+                      <Button type="submit">Save Changes</Button>
+                    </DialogFooter>
+                  </form>
+                </Form>
+              </DialogContent>
+            </Dialog>
+          </div>
           <p className="text-xl text-muted-foreground mb-8">
             Get insights into your commit history, most edited files, and language usage
             without using GitHub API.
@@ -114,6 +199,7 @@ const Index = () => {
               <AlertTitle>Connection Issues?</AlertTitle>
               <AlertDescription>
                 <p>The API service might be starting up from cold storage. Please wait up to 2 minutes and try again if your first attempt fails.</p>
+                <p className="mt-2">You can also set your own API URL by clicking the Settings icon above.</p>
                 <p className="mt-2">For testing, try using these example repositories:</p>
                 <ul className="mt-1 list-disc pl-5 text-left">
                   <li>https://github.com/facebook/react</li>

@@ -4,18 +4,28 @@ import { useLocation } from "react-router-dom";
 import { ChartContainer, ChartTooltipContent, ChartTooltip } from "@/components/ui/chart";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar } from "recharts";
 import { Button } from "@/components/ui/button";
-import { Calendar, ChartBar, ChartLine, ChartPie, Filter, Download } from "lucide-react";
+import { Calendar, ChartBar, ChartLine, ChartPie, Filter, Download, Settings } from "lucide-react";
 import { toast } from "@/components/ui/use-toast";
 import Layout from "@/components/Layout";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRepoLanguages, useRepoSummary, useTopFiles } from "@/hooks/useRepoData";
 import repoService from "@/services/repoService";
+import { getCurrentApiUrl } from "@/services/api";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 
 const Dashboard = () => {
   const location = useLocation();
   const [repoPath, setRepoPath] = useState("");
   const [timeRange, setTimeRange] = useState("week");
   const [isInitialLoading, setIsInitialLoading] = useState(true);
+  const [showApiInfo, setShowApiInfo] = useState(false);
   const queryClient = useQueryClient();
   
   // Get repo path from URL
@@ -160,6 +170,7 @@ const Dashboard = () => {
           <div className="text-center">
             <h2 className="text-2xl font-bold mb-4">Analyzing repository...</h2>
             <p className="text-muted-foreground mb-4">This may take a moment</p>
+            <p className="text-sm text-muted-foreground">Using API: {getCurrentApiUrl()}</p>
           </div>
         </div>
       </Layout>
@@ -177,6 +188,30 @@ const Dashboard = () => {
             </div>
             
             <div className="flex items-center gap-2">
+              <Dialog open={showApiInfo} onOpenChange={setShowApiInfo}>
+                <DialogTrigger asChild>
+                  <Button size="sm" variant="outline">
+                    <Settings className="h-4 w-4 mr-1" />
+                    API Info
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>API Information</DialogTitle>
+                    <DialogDescription>
+                      Current API URL configuration
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="mt-4">
+                    <p className="mb-2 font-semibold">Current API URL:</p>
+                    <code className="bg-muted p-2 rounded block break-all">{getCurrentApiUrl()}</code>
+                    <p className="mt-4 text-sm text-muted-foreground">
+                      You can change the API URL on the home page settings.
+                    </p>
+                  </div>
+                </DialogContent>
+              </Dialog>
+              
               <Button size="sm" variant="outline">
                 <Filter className="h-4 w-4 mr-1" />
                 Filter

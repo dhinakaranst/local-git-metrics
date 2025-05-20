@@ -9,16 +9,21 @@ import Layout from "@/components/Layout";
 import { useMutation } from "@tanstack/react-query";
 import repoService from "@/services/repoService";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { AlertCircle } from "lucide-react";
+import { AlertCircle, Clock } from "lucide-react";
 
 const Index = () => {
   const [repoPath, setRepoPath] = useState("");
+  const [isConnecting, setIsConnecting] = useState(false);
   const navigate = useNavigate();
 
   // Mutation for analyzing repository
   const analyzeRepoMutation = useMutation({
-    mutationFn: (path: string) => repoService.analyzeRepo(path),
+    mutationFn: (path: string) => {
+      setIsConnecting(true);
+      return repoService.analyzeRepo(path);
+    },
     onSuccess: (data) => {
+      setIsConnecting(false);
       toast({
         title: "Success",
         description: "Repository analyzed successfully",
@@ -26,6 +31,7 @@ const Index = () => {
       navigate(`/dashboard?path=${encodeURIComponent(repoPath)}`);
     },
     onError: (error: Error) => {
+      setIsConnecting(false);
       console.error("Repository analysis failed:", error);
       toast({
         title: "Error",
@@ -89,9 +95,15 @@ const Index = () => {
               <Button 
                 type="submit" 
                 className="w-full"
-                disabled={analyzeRepoMutation.isPending}
+                disabled={analyzeRepoMutation.isPending || isConnecting}
               >
-                {analyzeRepoMutation.isPending ? "Analyzing..." : "Analyze Repository"}
+                {analyzeRepoMutation.isPending || isConnecting ? 
+                  <span className="flex items-center gap-2">
+                    <Clock className="h-4 w-4 animate-spin" /> 
+                    {isConnecting ? "Connecting to server..." : "Analyzing..."}
+                  </span> : 
+                  "Analyze Repository"
+                }
               </Button>
             </form>
           </div>
@@ -101,7 +113,12 @@ const Index = () => {
               <AlertCircle className="h-4 w-4" />
               <AlertTitle>Connection Issues?</AlertTitle>
               <AlertDescription>
-                The API service might be starting up from cold storage. Please wait a moment and try again if your first attempt fails.
+                <p>The API service might be starting up from cold storage. Please wait up to 2 minutes and try again if your first attempt fails.</p>
+                <p className="mt-2">For testing, try using these example repositories:</p>
+                <ul className="mt-1 list-disc pl-5 text-left">
+                  <li>https://github.com/facebook/react</li>
+                  <li>https://github.com/vercel/next.js</li>
+                </ul>
               </AlertDescription>
             </Alert>
           </div>

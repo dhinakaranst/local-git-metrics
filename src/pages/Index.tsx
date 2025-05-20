@@ -1,4 +1,5 @@
-import { useState } from "react";
+
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -8,8 +9,8 @@ import Layout from "@/components/Layout";
 import { useMutation } from "@tanstack/react-query";
 import repoService from "@/services/repoService";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { AlertCircle, Clock, Settings } from "lucide-react";
-import { setCustomApiUrl, getCurrentApiUrl } from "@/services/api";
+import { AlertCircle, Clock, Settings, Wifi, WifiOff } from "lucide-react";
+import { setCustomApiUrl, getCurrentApiUrl, checkApiConnection } from "@/services/api";
 import {
   Dialog,
   DialogContent,
@@ -23,12 +24,13 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { TooltipProvider } from "@/components/ui/tooltip";
+import { TooltipProvider, Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 
 const Index = () => {
   const [repoPath, setRepoPath] = useState("");
   const [isConnecting, setIsConnecting] = useState(false);
   const [showApiSettings, setShowApiSettings] = useState(false);
+  const [apiStatus, setApiStatus] = useState<'checking' | 'online' | 'offline'>('checking');
   const navigate = useNavigate();
 
   // Form schema for API URL
@@ -42,6 +44,31 @@ const Index = () => {
       apiUrl: getCurrentApiUrl() === 'https://commit-metrics-api.onrender.com' ? '' : getCurrentApiUrl(),
     },
   });
+
+  // Check API connectivity on component mount
+  useEffect(() => {
+    const checkConnection = async () => {
+      setApiStatus('checking');
+      const isConnected = await checkApiConnection();
+      setApiStatus(isConnected ? 'online' : 'offline');
+
+      // Only show toast for offline status
+      if (!isConnected) {
+        toast({
+          title: "API Server Unavailable",
+          description: "Cannot connect to the API server. It may be starting up from cold storage or temporarily unavailable.",
+          variant: "destructive",
+        });
+      }
+    };
+
+    checkConnection();
+    
+    // Re-check connection every 30 seconds
+    const intervalId = setInterval(checkConnection, 30000);
+    
+    return () => clearInterval(intervalId);
+  }, []);
 
   // Mutation for analyzing repository
   const analyzeRepoMutation = useMutation({
@@ -79,6 +106,20 @@ const Index = () => {
       return;
     }
 
+    // Check API status before submitting
+    if (apiStatus === 'offline') {
+      const isConnected = await checkApiConnection();
+      if (!isConnected) {
+        toast({
+          title: "API Server Unavailable",
+          description: "Cannot connect to the API server. Please try again later or configure a different API URL.",
+          variant: "destructive",
+        });
+        return;
+      }
+      setApiStatus('online');
+    }
+
     analyzeRepoMutation.mutate(repoPath);
   };
 
@@ -98,6 +139,55 @@ const Index = () => {
       });
     }
     setShowApiSettings(false);
+    
+    // Check connection to the new API
+    setTimeout(() => {
+      checkApiConnection().then(isConnected => {
+        setApiStatus(isConnected ? 'online' : 'offline');
+      });
+    }, 500);
+  };
+
+  // Render API status indicator
+  const renderApiStatus = () => {
+    switch (apiStatus) {
+      case 'checking':
+        return (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div className="flex items-center text-yellow-500">
+                <Clock className="h-4 w-4 animate-pulse mr-1" />
+                <span className="text-xs">Checking API...</span>
+              </div>
+            </TooltipTrigger>
+            <TooltipContent>Checking connection to API server</TooltipContent>
+          </Tooltip>
+        );
+      case 'online':
+        return (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div className="flex items-center text-green-500">
+                <Wifi className="h-4 w-4 mr-1" />
+                <span className="text-xs">API Online</span>
+              </div>
+            </TooltipTrigger>
+            <TooltipContent>Connected to {getCurrentApiUrl()}</TooltipContent>
+          </Tooltip>
+        );
+      case 'offline':
+        return (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div className="flex items-center text-red-500">
+                <WifiOff className="h-4 w-4 mr-1" />
+                <span className="text-xs">API Offline</span>
+              </div>
+            </TooltipTrigger>
+            <TooltipContent>Cannot connect to {getCurrentApiUrl()}</TooltipContent>
+          </Tooltip>
+        );
+    }
   };
 
   return (
@@ -107,44 +197,47 @@ const Index = () => {
           <div className="max-w-2xl mx-auto text-center">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-4xl font-bold">Analyze Your Git Repository</h2>
-              <Dialog open={showApiSettings} onOpenChange={setShowApiSettings}>
-                <DialogTrigger asChild>
-                  <Button variant="outline" size="icon">
-                    <Settings className="h-4 w-4" />
-                  </Button>
-                </DialogTrigger>
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>API Settings</DialogTitle>
-                    <DialogDescription>
-                      Configure custom API endpoint for repository analysis.
-                    </DialogDescription>
-                  </DialogHeader>
-                  <Form {...apiForm}>
-                    <form onSubmit={apiForm.handleSubmit(onApiFormSubmit)} className="space-y-4">
-                      <FormField
-                        control={apiForm.control}
-                        name="apiUrl"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Custom API URL (optional)</FormLabel>
-                            <FormControl>
-                              <Input 
-                                placeholder="https://your-custom-api.com" 
-                                {...field} 
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <DialogFooter>
-                        <Button type="submit">Save Changes</Button>
-                      </DialogFooter>
-                    </form>
-                  </Form>
-                </DialogContent>
-              </Dialog>
+              <div className="flex items-center space-x-2">
+                {renderApiStatus()}
+                <Dialog open={showApiSettings} onOpenChange={setShowApiSettings}>
+                  <DialogTrigger asChild>
+                    <Button variant="outline" size="icon">
+                      <Settings className="h-4 w-4" />
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>API Settings</DialogTitle>
+                      <DialogDescription>
+                        Configure custom API endpoint for repository analysis.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <Form {...apiForm}>
+                      <form onSubmit={apiForm.handleSubmit(onApiFormSubmit)} className="space-y-4">
+                        <FormField
+                          control={apiForm.control}
+                          name="apiUrl"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Custom API URL (optional)</FormLabel>
+                              <FormControl>
+                                <Input 
+                                  placeholder="https://your-custom-api.com" 
+                                  {...field} 
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <DialogFooter>
+                          <Button type="submit">Save Changes</Button>
+                        </DialogFooter>
+                      </form>
+                    </Form>
+                  </DialogContent>
+                </Dialog>
+              </div>
             </div>
             <p className="text-xl text-muted-foreground mb-8">
               Get insights into your commit history, most edited files, and language usage
@@ -158,6 +251,34 @@ const Index = () => {
                   <AlertTitle>Error</AlertTitle>
                   <AlertDescription>
                     {analyzeRepoMutation.error?.message || "Failed to analyze repository. Please try again."}
+                  </AlertDescription>
+                </Alert>
+              )}
+              
+              {apiStatus === 'offline' && (
+                <Alert variant="destructive" className="mb-4">
+                  <WifiOff className="h-4 w-4" />
+                  <AlertTitle>API Server Unavailable</AlertTitle>
+                  <AlertDescription>
+                    <p>Cannot connect to the API server at {getCurrentApiUrl()}.</p>
+                    <p>It may be starting up from cold storage (this can take up to 2 minutes) or temporarily unavailable.</p>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="mt-2"
+                      onClick={async () => {
+                        const isConnected = await checkApiConnection();
+                        setApiStatus(isConnected ? 'online' : 'offline');
+                        if (isConnected) {
+                          toast({
+                            title: "Connection Restored",
+                            description: "Successfully connected to the API server.",
+                          });
+                        }
+                      }}
+                    >
+                      Check Again
+                    </Button>
                   </AlertDescription>
                 </Alert>
               )}
@@ -181,7 +302,7 @@ const Index = () => {
                 <Button 
                   type="submit" 
                   className="w-full"
-                  disabled={analyzeRepoMutation.isPending || isConnecting}
+                  disabled={analyzeRepoMutation.isPending || isConnecting || apiStatus === 'offline'}
                 >
                   {analyzeRepoMutation.isPending || isConnecting ? 
                     <span className="flex items-center gap-2">

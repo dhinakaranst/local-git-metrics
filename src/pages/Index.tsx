@@ -8,10 +8,27 @@ import { toast } from "@/components/ui/use-toast";
 import Layout from "@/components/Layout";
 import { useMutation } from "@tanstack/react-query";
 import repoService from "@/services/repoService";
+import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
+import { Wifi, WifiOff } from "lucide-react";
 
 const Index = () => {
   const [repoPath, setRepoPath] = useState("");
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
   const navigate = useNavigate();
+
+  // Monitor online status
+  useState(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+    
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  });
 
   // Mutation for analyzing repository
   const analyzeRepoMutation = useMutation({
@@ -59,6 +76,16 @@ const Index = () => {
             without using GitHub API.
           </p>
           
+          {!isOnline && (
+            <Alert variant="destructive" className="mb-6">
+              <WifiOff className="h-4 w-4" />
+              <AlertTitle>You are offline</AlertTitle>
+              <AlertDescription>
+                Please check your internet connection to analyze repositories.
+              </AlertDescription>
+            </Alert>
+          )}
+          
           <div className="bg-card rounded-lg p-6 shadow-sm border">
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="text-left">
@@ -79,7 +106,7 @@ const Index = () => {
               <Button 
                 type="submit" 
                 className="w-full"
-                disabled={analyzeRepoMutation.isPending}
+                disabled={analyzeRepoMutation.isPending || !isOnline}
               >
                 {analyzeRepoMutation.isPending ? "Analyzing..." : "Analyze Repository"}
               </Button>

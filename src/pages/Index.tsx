@@ -115,9 +115,10 @@ const Index = () => {
       return;
     }
 
-    // Check server status before analyzing
+    // Fix for TypeScript error - using strict equality check with string literal
     if (serverStatus !== 'ready') {
       await handleWakeServer();
+      // Additional check after waking up server
       if (serverStatus !== 'ready') {
         toast({
           title: "Server Not Ready",

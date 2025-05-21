@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -9,7 +9,7 @@ import Layout from "@/components/Layout";
 import { useMutation } from "@tanstack/react-query";
 import repoService from "@/services/repoService";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
-import { Wifi, WifiOff } from "lucide-react";
+import { Loader2, WifiOff } from "lucide-react";
 
 const Index = () => {
   const [repoPath, setRepoPath] = useState("");
@@ -17,7 +17,7 @@ const Index = () => {
   const navigate = useNavigate();
 
   // Monitor online status
-  useState(() => {
+  useEffect(() => {
     const handleOnline = () => setIsOnline(true);
     const handleOffline = () => setIsOnline(false);
     
@@ -28,7 +28,7 @@ const Index = () => {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
     };
-  });
+  }, []); // Fixed: Added empty dependency array to useEffect
 
   // Mutation for analyzing repository
   const analyzeRepoMutation = useMutation({
@@ -72,8 +72,7 @@ const Index = () => {
         <div className="max-w-2xl mx-auto text-center">
           <h2 className="text-4xl font-bold mb-6">Analyze Your Git Repository</h2>
           <p className="text-xl text-muted-foreground mb-8">
-            Get insights into your commit history, most edited files, and language usage
-            without using GitHub API.
+            Get insights into your commit history, most edited files, and language usage.
           </p>
           
           {!isOnline && (
@@ -85,21 +84,32 @@ const Index = () => {
               </AlertDescription>
             </Alert>
           )}
+
+          {analyzeRepoMutation.isError && (
+            <Alert variant="destructive" className="mb-6">
+              <AlertTitle>API Connection Error</AlertTitle>
+              <AlertDescription>
+                {analyzeRepoMutation.error instanceof Error 
+                  ? analyzeRepoMutation.error.message 
+                  : 'Unable to connect to the API server. It may be starting up or unavailable.'}
+              </AlertDescription>
+            </Alert>
+          )}
           
           <div className="bg-card rounded-lg p-6 shadow-sm border">
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="text-left">
-                <Label htmlFor="repoPath">Repository Path or URL</Label>
+                <Label htmlFor="repoPath">Repository URL</Label>
                 <Input 
                   id="repoPath"
                   type="text"
-                  placeholder="/path/to/repo or https://github.com/username/repo"
+                  placeholder="https://github.com/username/repo"
                   value={repoPath}
                   onChange={(e) => setRepoPath(e.target.value)}
                   className="mt-1"
                 />
                 <p className="text-sm text-muted-foreground mt-1">
-                  Enter the full path to your local Git repository or a GitHub URL
+                  Enter a GitHub URL like https://github.com/username/repo
                 </p>
               </div>
               
@@ -108,27 +118,14 @@ const Index = () => {
                 className="w-full"
                 disabled={analyzeRepoMutation.isPending || !isOnline}
               >
-                {analyzeRepoMutation.isPending ? "Analyzing..." : "Analyze Repository"}
+                {analyzeRepoMutation.isPending ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Analyzing...
+                  </>
+                ) : "Analyze Repository"}
               </Button>
             </form>
-          </div>
-          
-          <div className="mt-12">
-            <h3 className="text-xl font-medium mb-4">How it works</h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="bg-card p-4 rounded-lg border">
-                <div className="text-lg font-medium mb-2">1. Input Path</div>
-                <p className="text-muted-foreground">Enter the path to your local Git repository or a Git URL</p>
-              </div>
-              <div className="bg-card p-4 rounded-lg border">
-                <div className="text-lg font-medium mb-2">2. Analyze</div>
-                <p className="text-muted-foreground">Our tool analyzes your Git history and files</p>
-              </div>
-              <div className="bg-card p-4 rounded-lg border">
-                <div className="text-lg font-medium mb-2">3. View Insights</div>
-                <p className="text-muted-foreground">Get visual charts and metrics about your repository</p>
-              </div>
-            </div>
           </div>
         </div>
       </main>

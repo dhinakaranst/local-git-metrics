@@ -9,11 +9,14 @@ import Layout from "@/components/Layout";
 import { useMutation } from "@tanstack/react-query";
 import repoService from "@/services/repoService";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
-import { Loader2, WifiOff } from "lucide-react";
+import { Loader2, WifiOff, ServerOff } from "lucide-react";
+import { wakeUpServer } from "@/services/api";
 
 const Index = () => {
   const [repoPath, setRepoPath] = useState("");
   const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [isWakingServer, setIsWakingServer] = useState(false);
+  const [serverStatus, setServerStatus] = useState<'unknown' | 'waking' | 'ready' | 'unavailable'>('unknown');
   const navigate = useNavigate();
 
   // Monitor online status
@@ -24,11 +27,54 @@ const Index = () => {
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
     
+    // Initial server status check
+    checkServerStatus();
+    
     return () => {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
     };
-  }, []); // Fixed: Added empty dependency array to useEffect
+  }, []);
+
+  // Function to check if server is awake
+  const checkServerStatus = async () => {
+    if (!isOnline) return;
+    
+    try {
+      setServerStatus('waking');
+      const isAwake = await wakeUpServer();
+      setServerStatus(isAwake ? 'ready' : 'unavailable');
+    } catch (error) {
+      setServerStatus('unavailable');
+    }
+  };
+
+  // Function to wake up the server
+  const handleWakeServer = async () => {
+    setIsWakingServer(true);
+    setServerStatus('waking');
+    
+    try {
+      const isAwake = await wakeUpServer();
+      setServerStatus(isAwake ? 'ready' : 'unavailable');
+      
+      if (isAwake) {
+        toast({
+          title: "Success",
+          description: "API server is now awake and ready",
+        });
+      } else {
+        toast({
+          title: "Server Still Starting",
+          description: "The server is still starting up. Please try again in a moment.",
+        });
+      }
+    } catch (error) {
+      setServerStatus('unavailable');
+    } finally {
+      setIsWakingServer(false);
+    }
+  };
 
   // Mutation for analyzing repository
   const analyzeRepoMutation = useMutation({
@@ -44,6 +90,12 @@ const Index = () => {
     },
     onError: (error: Error) => {
       console.error("Repository analysis failed:", error);
+      
+      // Check if it's a server availability error
+      if (error.message.includes("API server") || error.message.includes("Failed to connect")) {
+        setServerStatus('unavailable');
+      }
+      
       toast({
         title: "Error",
         description: `Repository analysis failed: ${error.message}`,
@@ -61,6 +113,19 @@ const Index = () => {
         variant: "destructive",
       });
       return;
+    }
+
+    // Check server status before analyzing
+    if (serverStatus !== 'ready') {
+      await handleWakeServer();
+      if (serverStatus !== 'ready') {
+        toast({
+          title: "Server Not Ready",
+          description: "Please wait for the server to wake up before analyzing.",
+          variant: "destructive",
+        });
+        return;
+      }
     }
 
     analyzeRepoMutation.mutate(repoPath);
@@ -81,6 +146,39 @@ const Index = () => {
               <AlertTitle>You are offline</AlertTitle>
               <AlertDescription>
                 Please check your internet connection to analyze repositories.
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {isOnline && serverStatus === 'unavailable' && (
+            <Alert variant="destructive" className="mb-6">
+              <ServerOff className="h-4 w-4" />
+              <AlertTitle>API Server Unavailable</AlertTitle>
+              <AlertDescription className="flex flex-col gap-2">
+                <p>The API server appears to be in sleep mode. This is normal for free-tier services.</p>
+                <Button 
+                  variant="outline" 
+                  onClick={handleWakeServer}
+                  disabled={isWakingServer}
+                  className="mt-2"
+                >
+                  {isWakingServer ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Waking Server...
+                    </>
+                  ) : "Wake Up Server"}
+                </Button>
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {isOnline && serverStatus === 'waking' && !analyzeRepoMutation.isPending && (
+            <Alert className="mb-6 bg-yellow-50 border-yellow-200">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              <AlertTitle>Waking Up API Server</AlertTitle>
+              <AlertDescription>
+                The API server is starting up. This may take 30-60 seconds. Please wait...
               </AlertDescription>
             </Alert>
           )}
@@ -116,7 +214,7 @@ const Index = () => {
               <Button 
                 type="submit" 
                 className="w-full"
-                disabled={analyzeRepoMutation.isPending || !isOnline}
+                disabled={analyzeRepoMutation.isPending || !isOnline || serverStatus === 'waking'}
               >
                 {analyzeRepoMutation.isPending ? (
                   <>

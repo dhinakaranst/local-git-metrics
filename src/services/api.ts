@@ -13,8 +13,23 @@ const checkOnlineStatus = () => {
 // Helper function to delay execution
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
+// Function to wake up the Render.com server
+export const wakeUpServer = async (): Promise<boolean> => {
+  try {
+    console.log('Attempting to wake up API server...');
+    const response = await fetch(`${API_BASE_URL}/api/health`, { 
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' }
+    });
+    return response.ok;
+  } catch (error) {
+    console.log('Server wake-up ping failed, server might need more time to start up');
+    return false;
+  }
+};
+
 // Helper function for making API requests with retry capability
-const apiRequest = async (endpoint: string, options: RequestInit = {}, retries = 2) => {
+const apiRequest = async (endpoint: string, options: RequestInit = {}, retries = 3) => {
   try {
     // Check if network is online before making request
     if (!checkOnlineStatus()) {
@@ -51,7 +66,7 @@ const apiRequest = async (endpoint: string, options: RequestInit = {}, retries =
       if (retries > 0 && error instanceof TypeError && error.message === 'Failed to fetch') {
         console.log(`Retrying API request (${retries} attempts left)...`);
         // Wait before retrying (exponential backoff)
-        await delay(1000 * (3 - retries));
+        await delay(1000 * (4 - retries));
         return apiRequest(endpoint, options, retries - 1);
       }
       throw error;
@@ -61,7 +76,7 @@ const apiRequest = async (endpoint: string, options: RequestInit = {}, retries =
     
     // Enhance error message for network failures
     if (error instanceof TypeError && error.message === 'Failed to fetch') {
-      throw new Error('Failed to connect to the API server. The server might be sleeping or unavailable. Please try again in a few moments.');
+      throw new Error('The API server appears to be inactive. It may need a moment to start up. Please try again in 30-60 seconds.');
     }
     
     throw error;

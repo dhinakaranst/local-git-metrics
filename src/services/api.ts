@@ -2,6 +2,9 @@
 // Base API configuration
 const API_BASE_URL = 'https://commit-metrics-api.onrender.com';
 
+// Function to get current API URL
+export const getCurrentApiUrl = () => API_BASE_URL;
+
 // Helper function for making API requests
 const apiRequest = async (endpoint: string, options: RequestInit = {}) => {
   try {

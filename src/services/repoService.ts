@@ -45,14 +45,34 @@ export interface CommitsResponse {
 
 export const repoService = {
   // Analyze a repository from its path or URL
-  analyzeRepo: (repoPath: string): Promise<RepoAnalysisResponse> => {
+  analyzeRepo: async (repoPath: string): Promise<RepoAnalysisResponse> => {
     // Check if the path is a URL
     const isRemoteUrl = repoPath.startsWith('http://') || repoPath.startsWith('https://');
     
-    return apiRequest('/api/repo/analyze', {
-      method: 'POST',
-      body: JSON.stringify({ repoPath, isRemoteUrl }),
-    });
+    // Extract repo name for better error handling
+    let repoName = "repository";
+    if (isRemoteUrl) {
+      try {
+        const url = new URL(repoPath);
+        const pathParts = url.pathname.split('/').filter(Boolean);
+        if (pathParts.length >= 2) {
+          repoName = `${pathParts[0]}/${pathParts[1]}`;
+        }
+      } catch (e) {
+        // URL parsing failed, use default
+      }
+    }
+
+    try {
+      console.log(`Analyzing repo: ${repoPath}`);
+      return await apiRequest('/api/repo/analyze', {
+        method: 'POST',
+        body: JSON.stringify({ repoPath, isRemoteUrl }),
+      });
+    } catch (error) {
+      console.error(`Error analyzing ${repoName}:`, error);
+      throw error;
+    }
   },
 
   // Get the summary of the last analyzed repo

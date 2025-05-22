@@ -1,3 +1,4 @@
+
 // Base API configuration
 const API_BASE_URL = 'https://commit-metrics-api.onrender.com';
 
@@ -12,19 +13,21 @@ const checkOnlineStatus = () => {
 // Helper function to delay execution
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-// Function to wake up the server silently in the background
-// export const wakeUpServer = async (): Promise<boolean> => {
-//   try {
-//     const response = await fetch(`${API_BASE_URL}/api/health`, { 
-//       method: 'GET',
-//       headers: { 'Content-Type': 'application/json' }
-//     });
-//     return response.ok;
-//   } catch (error) {
-//     // Silently handle errors without showing to the user
-//     return false;
-//   }
-// };
+// Function to check if server is available
+export const checkServerAvailability = async (): Promise<boolean> => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/health`, { 
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' },
+      // Short timeout to prevent long waits
+      signal: AbortSignal.timeout(3000)
+    });
+    return response.ok;
+  } catch (error) {
+    console.log('Server health check failed:', error);
+    return false;
+  }
+};
 
 // Helper function for making API requests with retry capability
 const apiRequest = async (endpoint: string, options: RequestInit = {}, retries = 3) => {
@@ -50,7 +53,7 @@ const apiRequest = async (endpoint: string, options: RequestInit = {}, retries =
       // Handle non-2xx responses
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || `Request failed. Please try again.`);
+        throw new Error(errorData.message || `Request failed with status ${response.status}. Please try again.`);
       }
 
       // Handle PDF responses
@@ -61,7 +64,8 @@ const apiRequest = async (endpoint: string, options: RequestInit = {}, retries =
       return response.json();
     } catch (error) {
       // If we have retries left and it's a network error, retry the request
-      if (retries > 0 && error instanceof TypeError && error.message === 'Failed to fetch') {
+      if (retries > 0 && (error instanceof TypeError || error instanceof DOMException)) {
+        console.log(`Retry attempt ${4 - retries} for ${endpoint}`);
         // Wait before retrying (exponential backoff)
         await delay(1000 * (4 - retries));
         return apiRequest(endpoint, options, retries - 1);
@@ -71,9 +75,8 @@ const apiRequest = async (endpoint: string, options: RequestInit = {}, retries =
   } catch (error) {
     console.error('API request error:', error);
     
-    // Enhance error message but keep it generic for users
-    if (error instanceof TypeError && error.message === 'Failed to fetch') {
-      throw new Error('Unable to connect. Please try again later.');
+    if (error instanceof TypeError || error instanceof DOMException) {
+      throw new Error('Unable to connect to the analysis server. Please try again later.');
     }
     
     throw error;

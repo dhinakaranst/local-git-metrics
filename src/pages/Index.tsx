@@ -31,7 +31,7 @@ const Index = () => {
       
       toast({
         title: "Error",
-        description: `Repository analysis failed: ${error.message}`,
+        description: "Unable to analyze this repository. Please check the URL and try again.",
         variant: "destructive",
       });
     }

@@ -1,99 +1,55 @@
 
-import { Link } from "react-router-dom";
-import { Button } from "@/components/ui/button";
+import React from "react";
+import Layout from "@/components/Layout";
 
 const About = () => {
   return (
-    <div className="min-h-screen flex flex-col">
-      <header className="border-b">
-        <div className="container mx-auto py-4">
-          <h1 className="text-2xl font-bold">CommitMetrics</h1>
-        </div>
-      </header>
-      
-      <main className="flex-1 container mx-auto py-8 px-4">
+    <Layout>
+      <div className="container mx-auto py-8 px-4">
         <div className="max-w-3xl mx-auto">
-          <h2 className="text-4xl font-bold mb-6">About CommitMetrics</h2>
+          <h1 className="text-3xl font-bold mb-6">About CommitMetrics</h1>
           
-          <div className="space-y-8">
-            <section className="prose">
-              <p className="text-xl">
-                CommitMetrics is a self-hostable tool that provides insights into your Git repositories
-                without relying on external APIs like GitHub.
+          <div className="space-y-6">
+            <section>
+              <h2 className="text-xl font-semibold mb-3">What is CommitMetrics?</h2>
+              <p className="text-muted-foreground">
+                CommitMetrics is an open-source tool that provides insights into GitHub repositories.
+                Analyze commit history, contributor activity, and language usage with a simple, 
+                intuitive interface.
               </p>
             </section>
             
             <section>
-              <h3 className="text-2xl font-semibold mb-4">Features</h3>
-              <ul className="grid gap-3">
-                <li className="flex items-start">
-                  <span className="inline-flex items-center justify-center h-6 w-6 rounded-full bg-primary text-primary-foreground text-sm font-medium mr-2">✓</span>
-                  <span>Analyze commit history with detailed statistics</span>
-                </li>
-                <li className="flex items-start">
-                  <span className="inline-flex items-center justify-center h-6 w-6 rounded-full bg-primary text-primary-foreground text-sm font-medium mr-2">✓</span>
-                  <span>View commits per day, week, or month</span>
-                </li>
-                <li className="flex items-start">
-                  <span className="inline-flex items-center justify-center h-6 w-6 rounded-full bg-primary text-primary-foreground text-sm font-medium mr-2">✓</span>
-                  <span>Identify most frequently edited files</span>
-                </li>
-                <li className="flex items-start">
-                  <span className="inline-flex items-center justify-center h-6 w-6 rounded-full bg-primary text-primary-foreground text-sm font-medium mr-2">✓</span>
-                  <span>Analyze language distribution in your codebase</span>
-                </li>
-                <li className="flex items-start">
-                  <span className="inline-flex items-center justify-center h-6 w-6 rounded-full bg-primary text-primary-foreground text-sm font-medium mr-2">✓</span>
-                  <span>Export insights as PDF reports</span>
-                </li>
+              <h2 className="text-xl font-semibold mb-3">Features</h2>
+              <ul className="list-disc pl-5 space-y-2 text-muted-foreground">
+                <li>Commit history analysis</li>
+                <li>Contributor statistics</li>
+                <li>Most modified files tracking</li>
+                <li>Language usage breakdown</li>
+                <li>Commit frequency visualization</li>
               </ul>
             </section>
             
             <section>
-              <h3 className="text-2xl font-semibold mb-4">Privacy</h3>
-              <div className="bg-muted p-4 rounded-lg">
-                <p className="mb-2">CommitMetrics respects your privacy:</p>
-                <ul className="list-disc pl-5 space-y-1">
-                  <li>All analysis is performed locally</li>
-                  <li>No data is sent to external servers</li>
-                  <li>No GitHub API or external services are used</li>
-                  <li>Your code stays on your machine</li>
-                </ul>
-              </div>
-            </section>
-            
-            <section>
-              <h3 className="text-2xl font-semibold mb-4">How It Works</h3>
-              <p className="mb-4">
-                CommitMetrics uses Node.js to execute Git commands on your local 
-                repository and analyze the output. The data is then visualized using Recharts.
+              <h2 className="text-xl font-semibold mb-3">How it Works</h2>
+              <p className="text-muted-foreground">
+                CommitMetrics uses the GitHub API to fetch repository data, then processes and 
+                visualizes this information using modern charting libraries. All processing happens 
+                server-side for optimal performance.
               </p>
-              <div className="bg-card p-4 rounded-lg border">
-                <code className="block whitespace-pre overflow-x-auto text-sm">
-{`# Sample Git commands used:
-git log --pretty=format:"%h|%an|%ad|%s" --date=short
-git log --name-only --pretty=format:
-git ls-files`}
-                </code>
-              </div>
             </section>
             
             <section>
-              <h3 className="text-2xl font-semibold mb-4">Get Started</h3>
-              <Link to="/">
-                <Button size="lg">Analyze a Repository</Button>
-              </Link>
+              <h2 className="text-xl font-semibold mb-3">Privacy & Data Usage</h2>
+              <p className="text-muted-foreground">
+                CommitMetrics only analyzes public repositories. No data is stored permanently on our servers,
+                and all analysis happens on-demand. We don't track or store your GitHub credentials.
+              </p>
             </section>
           </div>
         </div>
-      </main>
-      
-      <footer className="border-t mt-auto">
-        <div className="container mx-auto py-4 text-center text-muted-foreground">
-          <p>CommitMetrics &copy; 2025 - A self-hostable Git analytics tool</p>
-        </div>
-      </footer>
-    </div>
+      </div>
+    </Layout>
   );
 };
 

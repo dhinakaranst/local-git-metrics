@@ -17,7 +17,7 @@ const Layout = ({ children }: LayoutProps) => {
                 <li><Link to="/" className="hover:text-primary">Home</Link></li>
                 <li><Link to="/about" className="hover:text-primary">About</Link></li>
               </ul>
-            </div>
+            </nav>
           </div>
         </div>
       </header>

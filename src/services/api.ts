@@ -13,18 +13,18 @@ const checkOnlineStatus = () => {
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 // Function to wake up the server silently in the background
-export const wakeUpServer = async (): Promise<boolean> => {
-  try {
-    const response = await fetch(`${API_BASE_URL}/api/health`, { 
-      method: 'GET',
-      headers: { 'Content-Type': 'application/json' }
-    });
-    return response.ok;
-  } catch (error) {
-    // Silently handle errors without showing to the user
-    return false;
-  }
-};
+// export const wakeUpServer = async (): Promise<boolean> => {
+//   try {
+//     const response = await fetch(`${API_BASE_URL}/api/health`, { 
+//       method: 'GET',
+//       headers: { 'Content-Type': 'application/json' }
+//     });
+//     return response.ok;
+//   } catch (error) {
+//     // Silently handle errors without showing to the user
+//     return false;
+//   }
+// };
 
 // Helper function for making API requests with retry capability
 const apiRequest = async (endpoint: string, options: RequestInit = {}, retries = 3) => {

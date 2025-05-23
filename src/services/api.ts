@@ -13,22 +13,6 @@ const checkOnlineStatus = () => {
 // Helper function to delay execution
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-// Function to check if server is available
-export const checkServerAvailability = async (): Promise<boolean> => {
-  try {
-    const response = await fetch(`${API_BASE_URL}/api/health`, { 
-      method: 'GET',
-      headers: { 'Content-Type': 'application/json' },
-      // Short timeout to prevent long waits
-      signal: AbortSignal.timeout(3000)
-    });
-    return response.ok;
-  } catch (error) {
-    console.log('Server health check failed:', error);
-    return false;
-  }
-};
-
 // Helper function for making API requests with retry capability
 const apiRequest = async (endpoint: string, options: RequestInit = {}, retries = 3) => {
   try {

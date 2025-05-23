@@ -1,22 +1,26 @@
 
 import { useEffect, useState } from "react";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { ChartContainer, ChartTooltipContent, ChartTooltip } from "@/components/ui/chart";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar } from "recharts";
 import { Button } from "@/components/ui/button";
-import { Calendar, ChartBar, ChartLine, ChartPie, Filter, Download } from "lucide-react";
+import { Calendar, ChartBar, ChartLine, ChartPie, Filter, Download, RefreshCw, GitCommitHorizontal, Clock, History } from "lucide-react";
 import { toast } from "@/components/ui/use-toast";
 import Layout from "@/components/Layout";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useRepoLanguages, useRepoSummary, useTopFiles } from "@/hooks/useRepoData";
+import { useRepoLanguages, useTopFiles, useRepoSummary, useCommitActivity } from "@/hooks/useRepoData";
 import repoService from "@/services/repoService";
+import TimeRangeFilter from "@/components/TimeRangeFilter";
+import { useRepoCache } from "@/hooks/useRepoCache";
 
 const Dashboard = () => {
   const location = useLocation();
+  const navigate = useNavigate();
   const [repoPath, setRepoPath] = useState("");
   const [timeRange, setTimeRange] = useState("week");
   const [isInitialLoading, setIsInitialLoading] = useState(true);
   const queryClient = useQueryClient();
+  const { cacheData, saveToCache, clearCache } = useRepoCache();
   
   // Get repo path from URL
   useEffect(() => {
@@ -25,13 +29,23 @@ const Dashboard = () => {
     if (path) {
       setRepoPath(decodeURIComponent(path));
       analyzePath(decodeURIComponent(path));
+    } else {
+      // Redirect to home if no path provided
+      navigate("/");
     }
   }, [location]);
+
+  // Function to handle time range changes
+  const handleTimeRangeChange = (range: string) => {
+    setTimeRange(range);
+    // Refresh queries that depend on time range
+    queryClient.invalidateQueries({ queryKey: ['repoCommits'] });
+  };
 
   // Mutation for analyzing repo
   const analyzeRepoMutation = useMutation({
     mutationFn: (path: string) => repoService.analyzeRepo(path),
-    onSuccess: () => {
+    onSuccess: (response) => {
       toast({
         title: "Repository analyzed successfully",
         description: "View the analytics below",
@@ -42,6 +56,7 @@ const Dashboard = () => {
       queryClient.invalidateQueries({ queryKey: ['repoSummary'] });
       queryClient.invalidateQueries({ queryKey: ['repoLanguages'] });
       queryClient.invalidateQueries({ queryKey: ['topFiles'] });
+      queryClient.invalidateQueries({ queryKey: ['repoCommits'] });
     },
     onError: (error: Error) => {
       toast({
@@ -57,6 +72,12 @@ const Dashboard = () => {
   const analyzePath = (path: string) => {
     setIsInitialLoading(true);
     analyzeRepoMutation.mutate(path);
+  };
+
+  // Function to handle refresh
+  const handleRefresh = () => {
+    clearCache();
+    analyzePath(repoPath);
   };
 
   // Mutation for exporting as PDF
@@ -93,7 +114,8 @@ const Dashboard = () => {
   // Data queries
   const { data: languages } = useRepoLanguages();
   const { data: topFiles } = useTopFiles(5);
-  const { data: summary } = useRepoSummary();
+  const { data: summary } = useRepoSummary(repoPath);
+  const { commitActivityData } = useCommitActivity(timeRange);
 
   // Prepare data for charts
   const languageData = languages ? 
@@ -104,13 +126,6 @@ const Dashboard = () => {
     })) : [];
 
   const topFilesData = topFiles || [];
-
-  // Commit chart data
-  const commitData = summary?.commitCountByDate ? 
-    Object.entries(summary.commitCountByDate).map(([date, count]) => ({
-      date,
-      commits: count,
-    })).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()) : [];
 
   // Chart configurations
   const chartConfig = {
@@ -124,6 +139,7 @@ const Dashboard = () => {
       TypeScript: { label: "TypeScript", color: "#3178c6" },
       CSS: { label: "CSS", color: "#264de4" },
       HTML: { label: "HTML", color: "#e34c26" },
+      Java: { label: "Java", color: "#b07219" },
     },
   };
 
@@ -152,6 +168,11 @@ const Dashboard = () => {
     return colors[language] || `#${Math.floor(Math.random()*16777215).toString(16)}`;
   }
 
+  // Get cache info
+  const lastUpdated = cacheData?.timestamp 
+    ? new Date(cacheData.timestamp).toLocaleString() 
+    : "Never";
+
   // Render loading state
   if (isInitialLoading) {
     return (
@@ -173,18 +194,29 @@ const Dashboard = () => {
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <div>
               <h1 className="text-2xl font-bold">Repository Dashboard</h1>
-              <p className="text-sm text-muted-foreground">{repoPath}</p>
+              <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                <GitCommitHorizontal className="h-4 w-4" />
+                <p>{repoPath}</p>
+              </div>
+              <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
+                <Clock className="h-3 w-3" />
+                <p>Last updated: {lastUpdated}</p>
+              </div>
             </div>
             
-            <div className="flex items-center gap-2">
-              <Button size="sm" variant="outline">
-                <Filter className="h-4 w-4 mr-1" />
-                Filter
+            <div className="flex items-center gap-2 flex-wrap">
+              <TimeRangeFilter onFilterChange={handleTimeRangeChange} />
+              
+              <Button 
+                size="sm" 
+                variant="outline"
+                onClick={handleRefresh}
+                className="ml-2"
+              >
+                <RefreshCw className="h-4 w-4 mr-1" />
+                Refresh
               </Button>
-              <Button size="sm" variant="outline">
-                <Calendar className="h-4 w-4 mr-1" />
-                {timeRange === "week" ? "Last Week" : timeRange === "month" ? "Last Month" : "All Time"}
-              </Button>
+              
               <Button 
                 size="sm"
                 onClick={() => exportPdfMutation.mutate()}
@@ -211,7 +243,7 @@ const Dashboard = () => {
                 >
                   <ResponsiveContainer width="100%" height="100%">
                     <AreaChart
-                      data={commitData}
+                      data={commitActivityData}
                       margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
                     >
                       <defs>
@@ -296,6 +328,27 @@ const Dashboard = () => {
             </div>
           </div>
         </div>
+
+        {summary && (
+          <div className="mt-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="bg-card rounded-lg p-4 border">
+              <h3 className="text-sm font-medium text-muted-foreground mb-1">Total Commits</h3>
+              <p className="text-2xl font-bold">{summary.totalCommits || 0}</p>
+            </div>
+            <div className="bg-card rounded-lg p-4 border">
+              <h3 className="text-sm font-medium text-muted-foreground mb-1">Languages</h3>
+              <p className="text-2xl font-bold">{languages ? Object.keys(languages).length : 0}</p>
+            </div>
+            <div className="bg-card rounded-lg p-4 border">
+              <h3 className="text-sm font-medium text-muted-foreground mb-1">Contributors</h3>
+              <p className="text-2xl font-bold">{summary.authors?.length || 0}</p>
+            </div>
+            <div className="bg-card rounded-lg p-4 border">
+              <h3 className="text-sm font-medium text-muted-foreground mb-1">Files Changed</h3>
+              <p className="text-2xl font-bold">{topFiles?.length || 0}</p>
+            </div>
+          </div>
+        )}
       </div>
     </Layout>
   );

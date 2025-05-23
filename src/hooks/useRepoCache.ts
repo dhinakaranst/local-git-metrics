@@ -12,12 +12,19 @@ interface RepoCacheData {
  */
 export const useRepoCache = () => {
   const [cacheData, setCacheData] = useState<RepoCacheData | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   
   // Load cache on first render
   useEffect(() => {
-    const savedData = localStorage.getItem('commitMetrics_lastRepo');
-    if (savedData) {
-      setCacheData(JSON.parse(savedData));
+    try {
+      const savedData = localStorage.getItem('commitMetrics_lastRepo');
+      if (savedData) {
+        setCacheData(JSON.parse(savedData));
+      }
+    } catch (error) {
+      console.error("Error loading from cache:", error);
+    } finally {
+      setIsLoading(false);
     }
   }, []);
   
@@ -29,27 +36,43 @@ export const useRepoCache = () => {
       timestamp: Date.now()
     };
     
-    localStorage.setItem('commitMetrics_lastRepo', JSON.stringify(cacheEntry));
-    setCacheData(cacheEntry);
+    try {
+      localStorage.setItem('commitMetrics_lastRepo', JSON.stringify(cacheEntry));
+      setCacheData(cacheEntry);
+    } catch (error) {
+      console.error("Error saving to cache:", error);
+    }
   };
   
   // Clear cache
   const clearCache = () => {
-    localStorage.removeItem('commitMetrics_lastRepo');
-    setCacheData(null);
+    try {
+      localStorage.removeItem('commitMetrics_lastRepo');
+      setCacheData(null);
+    } catch (error) {
+      console.error("Error clearing cache:", error);
+    }
   };
   
   // Check if cache is valid (less than 1 hour old)
-  const isCacheValid = () => {
+  const isCacheValid = (maxAgeMinutes: number = 60) => {
     if (!cacheData) return false;
-    const oneHour = 60 * 60 * 1000;
-    return (Date.now() - cacheData.timestamp) < oneHour;
+    const maxAge = maxAgeMinutes * 60 * 1000;
+    return (Date.now() - cacheData.timestamp) < maxAge;
+  };
+  
+  // Get cache for specific repo
+  const getCacheForRepo = (path: string) => {
+    if (!cacheData || cacheData.path !== path) return null;
+    return cacheData;
   };
   
   return {
     cacheData,
     saveToCache,
     clearCache,
-    isCacheValid
+    isCacheValid,
+    getCacheForRepo,
+    isLoading
   };
 };

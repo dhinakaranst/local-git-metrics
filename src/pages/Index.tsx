@@ -17,6 +17,7 @@ const Index = () => {
   // Mutation for analyzing repository
   const analyzeRepoMutation = useMutation({
     mutationFn: (path: string) => {
+      console.log("Analyzing repository:", path);
       return repoService.analyzeRepo(path);
     },
     onSuccess: (data) => {
@@ -61,7 +62,7 @@ const Index = () => {
       return;
     }
 
-    // Try to connect and analyze
+    // Try to analyze
     analyzeRepoMutation.mutate(repoPath);
   };
 
@@ -103,6 +104,10 @@ const Index = () => {
                   </>
                 ) : "Analyze Repository"}
               </Button>
+
+              <p className="text-sm text-muted-foreground mt-2">
+                Using local repository analysis engine
+              </p>
             </form>
           </div>
         </div>

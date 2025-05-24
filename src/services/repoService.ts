@@ -48,7 +48,7 @@ export interface CommitsResponse {
 let currentRepoPath: string = '';
 
 export const repoService = {
-  // Analyze a repository using GitHub API
+  // Analyze a repository - try GitHub API first, fall back to mock data
   analyzeRepo: async (repoPath: string): Promise<RepoAnalysisResponse> => {
     console.log(`Analyzing repository: ${repoPath}`);
     
@@ -57,11 +57,11 @@ export const repoService = {
       throw new Error('Only GitHub repositories are supported');
     }
 
+    // Store the current repo path for other service calls
+    currentRepoPath = repoPath;
+    
     try {
-      // Store the current repo path for other service calls
-      currentRepoPath = repoPath;
-      
-      // Use GitHub API for real analysis
+      // Try GitHub API first
       const result = await githubService.analyzeRepository(repoPath);
       
       // Save the result to localStorage for caching
@@ -73,8 +73,18 @@ export const repoService = {
 
       return result;
     } catch (error) {
-      console.error(`Error analyzing repository:`, error);
-      throw error;
+      console.error(`GitHub API failed, falling back to mock data:`, error);
+      
+      // Fall back to mock data simulation
+      try {
+        return await apiRequest('/api/repo/analyze', {
+          method: 'POST',
+          body: JSON.stringify({ repoPath })
+        });
+      } catch (fallbackError) {
+        console.error('Fallback also failed:', fallbackError);
+        throw new Error('Unable to analyze repository. Please try again later.');
+      }
     }
   },
 
@@ -87,6 +97,7 @@ export const repoService = {
     }
 
     try {
+      // Try GitHub API first
       const summary = await githubService.getSummary(pathToUse);
       
       // Ensure authors is properly typed as string[]
@@ -95,8 +106,15 @@ export const repoService = {
         authors: summary.authors.filter((author): author is string => typeof author === 'string')
       };
     } catch (error) {
-      console.error('Error getting repo summary:', error);
-      throw error;
+      console.error('GitHub API failed for summary, falling back to cached data:', error);
+      
+      // Fall back to cached/mock data
+      try {
+        return await apiRequest('/api/repo/summary');
+      } catch (fallbackError) {
+        console.error('Fallback summary failed:', fallbackError);
+        throw new Error('Unable to get repository summary. Please analyze a repository first.');
+      }
     }
   },
 
@@ -111,10 +129,28 @@ export const repoService = {
     }
 
     try {
+      // Try GitHub API first
       return await githubService.getCommits(currentRepoPath, startDate, endDate, author);
     } catch (error) {
-      console.error('Error getting commits:', error);
-      throw error;
+      console.error('GitHub API failed for commits, falling back to cached data:', error);
+      
+      // Fall back to cached/mock data
+      try {
+        let endpoint = '/api/repo/commits';
+        const params = new URLSearchParams();
+        if (startDate) params.append('start_date', startDate);
+        if (endDate) params.append('end_date', endDate);
+        if (author) params.append('author', author);
+        
+        if (params.toString()) {
+          endpoint += `?${params.toString()}`;
+        }
+        
+        return await apiRequest(endpoint);
+      } catch (fallbackError) {
+        console.error('Fallback commits failed:', fallbackError);
+        throw new Error('Unable to get commits. Please analyze a repository first.');
+      }
     }
   },
 
@@ -125,10 +161,18 @@ export const repoService = {
     }
 
     try {
+      // Try GitHub API first
       return await githubService.getLanguages(currentRepoPath);
     } catch (error) {
-      console.error('Error getting languages:', error);
-      throw error;
+      console.error('GitHub API failed for languages, falling back to cached data:', error);
+      
+      // Fall back to cached/mock data
+      try {
+        return await apiRequest('/api/repo/languages');
+      } catch (fallbackError) {
+        console.error('Fallback languages failed:', fallbackError);
+        throw new Error('Unable to get languages. Please analyze a repository first.');
+      }
     }
   },
 
@@ -139,11 +183,20 @@ export const repoService = {
     }
 
     try {
+      // Try GitHub API first
       const summary = await githubService.getSummary(currentRepoPath);
       return summary.topFiles.slice(0, limit || 10);
     } catch (error) {
-      console.error('Error getting top files:', error);
-      throw error;
+      console.error('GitHub API failed for top files, falling back to cached data:', error);
+      
+      // Fall back to cached/mock data
+      try {
+        const endpoint = limit ? `/api/repo/top-files?limit=${limit}` : '/api/repo/top-files';
+        return await apiRequest(endpoint);
+      } catch (fallbackError) {
+        console.error('Fallback top files failed:', fallbackError);
+        throw new Error('Unable to get top files. Please analyze a repository first.');
+      }
     }
   },
 

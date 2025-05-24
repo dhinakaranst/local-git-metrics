@@ -1,17 +1,15 @@
 
 import { useQuery } from '@tanstack/react-query';
 import repoService from '@/services/repoService';
-import { useRepoCache } from './useRepoCache';
 
 // Hook for getting summary data
 export const useRepoSummary = (repoPath?: string) => {
-  const { getCacheForRepo } = useRepoCache();
-  
   return useQuery({
     queryKey: ['repoSummary', repoPath],
-    queryFn: () => repoService.getRepoSummary(),
+    queryFn: () => repoService.getRepoSummary(repoPath),
     enabled: !!repoPath,
-    staleTime: 1000 * 60 * 30, // 30 minutes
+    staleTime: 1000 * 60 * 10, // 10 minutes for real data
+    retry: 2,
   });
 };
 
@@ -33,13 +31,19 @@ export const useRepoCommits = (timeRange?: string, author?: string) => {
       const lastMonth = new Date();
       lastMonth.setMonth(now.getMonth() - 1);
       startDate = lastMonth.toISOString().split('T')[0];
+    } else if (timeRange === 'year') {
+      const lastYear = new Date();
+      lastYear.setFullYear(now.getFullYear() - 1);
+      startDate = lastYear.toISOString().split('T')[0];
     }
   }
   
   return useQuery({
-    queryKey: ['repoCommits', timeRange, author],
+    queryKey: ['repoCommits', timeRange, author, startDate, endDate],
     queryFn: () => repoService.getCommits(startDate, endDate, author),
     enabled: !!timeRange,
+    staleTime: 1000 * 60 * 5, // 5 minutes for real data
+    retry: 2,
   });
 };
 
@@ -48,7 +52,8 @@ export const useRepoLanguages = () => {
   return useQuery({
     queryKey: ['repoLanguages'],
     queryFn: () => repoService.getLanguages(),
-    staleTime: 1000 * 60 * 60, // 1 hour
+    staleTime: 1000 * 60 * 30, // 30 minutes for languages
+    retry: 2,
   });
 };
 
@@ -57,13 +62,14 @@ export const useTopFiles = (limit: number = 5) => {
   return useQuery({
     queryKey: ['topFiles', limit],
     queryFn: () => repoService.getTopFiles(limit),
-    staleTime: 1000 * 60 * 60, // 1 hour
+    staleTime: 1000 * 60 * 30, // 30 minutes for file data
+    retry: 2,
   });
 };
 
 // Hook for getting commit activity data formatted for charts
 export const useCommitActivity = (timeRange: string = 'week') => {
-  const { data: commitData } = useRepoCommits(timeRange);
+  const { data: commitData, isLoading, error } = useRepoCommits(timeRange);
   
   // Process the data for the activity chart
   const commitActivityData = commitData?.commits
@@ -79,5 +85,9 @@ export const useCommitActivity = (timeRange: string = 'week') => {
         .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
     : [];
     
-  return { commitActivityData };
+  return { 
+    commitActivityData, 
+    isLoading, 
+    error 
+  };
 };

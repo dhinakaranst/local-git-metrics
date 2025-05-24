@@ -87,7 +87,13 @@ export const repoService = {
     }
 
     try {
-      return await githubService.getSummary(pathToUse);
+      const summary = await githubService.getSummary(pathToUse);
+      
+      // Ensure authors is properly typed as string[]
+      return {
+        ...summary,
+        authors: summary.authors.filter((author): author is string => typeof author === 'string')
+      };
     } catch (error) {
       console.error('Error getting repo summary:', error);
       throw error;

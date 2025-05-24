@@ -48,7 +48,7 @@ export interface CommitsResponse {
 let currentRepoPath: string = '';
 
 export const repoService = {
-  // Analyze a repository - try GitHub API first, fall back to mock data
+  // Analyze a repository - try GitHub API first, fall back to local simulation
   analyzeRepo: async (repoPath: string): Promise<RepoAnalysisResponse> => {
     console.log(`Analyzing repository: ${repoPath}`);
     
@@ -62,6 +62,7 @@ export const repoService = {
     
     try {
       // Try GitHub API first
+      console.log('Attempting GitHub API analysis...');
       const result = await githubService.analyzeRepository(repoPath);
       
       // Save the result to localStorage for caching
@@ -71,20 +72,17 @@ export const repoService = {
         timestamp: Date.now()
       }));
 
+      console.log('GitHub API analysis successful');
       return result;
     } catch (error) {
-      console.error(`GitHub API failed, falling back to mock data:`, error);
+      console.error(`GitHub API failed, falling back to local simulation:`, error);
       
-      // Fall back to mock data simulation
-      try {
-        return await apiRequest('/api/repo/analyze', {
-          method: 'POST',
-          body: JSON.stringify({ repoPath })
-        });
-      } catch (fallbackError) {
-        console.error('Fallback also failed:', fallbackError);
-        throw new Error('Unable to analyze repository. Please try again later.');
-      }
+      // Fall back to local simulation - this will use the local mock data generator
+      console.log('Using local repository simulation...');
+      return await apiRequest('/api/repo/analyze', {
+        method: 'POST',
+        body: JSON.stringify({ repoPath })
+      });
     }
   },
 
@@ -106,15 +104,22 @@ export const repoService = {
         authors: summary.authors.filter((author): author is string => typeof author === 'string')
       };
     } catch (error) {
-      console.error('GitHub API failed for summary, falling back to cached data:', error);
+      console.error('GitHub API failed for summary, using cached/local data:', error);
       
-      // Fall back to cached/mock data
-      try {
-        return await apiRequest('/api/repo/summary');
-      } catch (fallbackError) {
-        console.error('Fallback summary failed:', fallbackError);
-        throw new Error('Unable to get repository summary. Please analyze a repository first.');
+      // Use cached data from localStorage
+      const saved = localStorage.getItem('commitMetrics_lastRepo');
+      if (saved) {
+        const { data } = JSON.parse(saved);
+        return {
+          totalCommits: data.commits.length,
+          topFiles: data.filesChanged.slice(0, 5),
+          languages: data.languages,
+          authors: data.authors,
+          commitCountByDate: data.commitCountByDate
+        };
       }
+      
+      throw new Error('No repository data available. Please analyze a repository first.');
     }
   },
 
@@ -132,25 +137,30 @@ export const repoService = {
       // Try GitHub API first
       return await githubService.getCommits(currentRepoPath, startDate, endDate, author);
     } catch (error) {
-      console.error('GitHub API failed for commits, falling back to cached data:', error);
+      console.error('GitHub API failed for commits, using cached/local data:', error);
       
-      // Fall back to cached/mock data
-      try {
-        let endpoint = '/api/repo/commits';
-        const params = new URLSearchParams();
-        if (startDate) params.append('start_date', startDate);
-        if (endDate) params.append('end_date', endDate);
-        if (author) params.append('author', author);
+      // Use cached data from localStorage
+      const saved = localStorage.getItem('commitMetrics_lastRepo');
+      if (saved) {
+        let commits = JSON.parse(saved).data.commits;
         
-        if (params.toString()) {
-          endpoint += `?${params.toString()}`;
+        // Apply filters if provided
+        if (startDate || endDate || author) {
+          commits = commits.filter((commit: CommitData) => {
+            let include = true;
+            
+            if (startDate && commit.date < startDate) include = false;
+            if (endDate && commit.date > endDate) include = false;
+            if (author && commit.author !== author) include = false;
+            
+            return include;
+          });
         }
         
-        return await apiRequest(endpoint);
-      } catch (fallbackError) {
-        console.error('Fallback commits failed:', fallbackError);
-        throw new Error('Unable to get commits. Please analyze a repository first.');
+        return { commits };
       }
+      
+      throw new Error('No repository data available. Please analyze a repository first.');
     }
   },
 
@@ -164,15 +174,15 @@ export const repoService = {
       // Try GitHub API first
       return await githubService.getLanguages(currentRepoPath);
     } catch (error) {
-      console.error('GitHub API failed for languages, falling back to cached data:', error);
+      console.error('GitHub API failed for languages, using cached/local data:', error);
       
-      // Fall back to cached/mock data
-      try {
-        return await apiRequest('/api/repo/languages');
-      } catch (fallbackError) {
-        console.error('Fallback languages failed:', fallbackError);
-        throw new Error('Unable to get languages. Please analyze a repository first.');
+      // Use cached data from localStorage
+      const saved = localStorage.getItem('commitMetrics_lastRepo');
+      if (saved) {
+        return JSON.parse(saved).data.languages;
       }
+      
+      throw new Error('No repository data available. Please analyze a repository first.');
     }
   },
 
@@ -187,16 +197,15 @@ export const repoService = {
       const summary = await githubService.getSummary(currentRepoPath);
       return summary.topFiles.slice(0, limit || 10);
     } catch (error) {
-      console.error('GitHub API failed for top files, falling back to cached data:', error);
+      console.error('GitHub API failed for top files, using cached/local data:', error);
       
-      // Fall back to cached/mock data
-      try {
-        const endpoint = limit ? `/api/repo/top-files?limit=${limit}` : '/api/repo/top-files';
-        return await apiRequest(endpoint);
-      } catch (fallbackError) {
-        console.error('Fallback top files failed:', fallbackError);
-        throw new Error('Unable to get top files. Please analyze a repository first.');
+      // Use cached data from localStorage
+      const saved = localStorage.getItem('commitMetrics_lastRepo');
+      if (saved) {
+        return JSON.parse(saved).data.filesChanged.slice(0, limit || 10);
       }
+      
+      throw new Error('No repository data available. Please analyze a repository first.');
     }
   },
 
